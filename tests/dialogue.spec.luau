@@ -1,0 +1,63 @@
+local Model=require("../src/dialogue/Model")
+local Example=require("../src/dialogue/Example")
+local count=0
+local function test(name,f) f() count+=1 print("PASS "..name) end
+local function eq(a,b) assert(a==b,tostring(a).." ~= "..tostring(b)) end
+local function reject(config,fragment) local errors=Model.Validate(config) assert(table.concat(errors,"\n"):find(fragment,1,true),table.concat(errors,"\n")) end
+test("example branches, grants item and completes",function()
+ eq(#Model.Validate(Example),0)
+ local p,s,session=Example.projects[1],Model.State(),{node="start"}
+ local v=assert(Model.Advance(p,session,s)) eq(v.node,"greeting") eq(#v.choices,2)
+ v=assert(Model.Advance(p,session,s,1)) eq(v.node,"thanks") eq(s.items.village_token,1)
+ v=assert(Model.Advance(p,session,s,"continue")) assert(v.ended) eq(s.completed[p.id],true)
+end)
+test("declined gift does not grant anything",function()
+ local s,session=Model.State(),{node="start"} Model.Advance(Example.projects[1],session,s)
+ assert(Model.Advance(Example.projects[1],session,s,2).ended) eq(s.items.village_token,nil)
+end)
+test("one-time actions cannot be farmed by closing and restarting",function()
+ local p,s=Example.projects[1],Model.State()
+ for _=1,2 do local session={node="start"} Model.Advance(p,session,s) Model.Advance(p,session,s,1) end
+ eq(s.items.village_token,1)
+end)
+test("repeatable project explicitly repeats its actions",function()
+ local p,s=Model.Clone(Example.projects[1]),Model.State() p.repeatable=true
+ for _=1,2 do local session={node="start"} Model.Advance(p,session,s) Model.Advance(p,session,s,1) end eq(s.items.village_token,2)
+end)
+test("conditions cover inventory currency quest level and attributes",function()
+ local s=Model.State() s.items.key=2 s.currency=10 s.level=5 s.quests.q="Completed" s.attributes.Friend=true
+ for _,c in ipairs({{type="Item",key="key",amount=2},{type="Currency",amount=10},{type="Quest",key="q"},{type="Level",amount=5},{type="Attribute",key="Friend",value="true"},{type="Always"}}) do assert(Model.Test(c,s)) end
+ eq(Model.Test({type="Currency",amount=11},s),false)
+end)
+test("hidden disabled and forged choices use authoritative conditions",function()
+ local p,s=Model.Clone(Example.projects[1]),Model.State()
+ p.nodes[2].choices[2].condition={type="Currency",amount=10} p.nodes[2].choices[2].visibility="Hide"
+ local session={node="start"} local v=Model.Advance(p,session,s) eq(#v.choices,1)
+ local bad=Model.Advance(p,session,s,2) eq(bad,nil)
+ p.nodes[2].choices[2].visibility="Disable" session={node="start"} v=Model.Advance(p,session,s) eq(#v.choices,2) eq(v.choices[2].enabled,false)
+end)
+test("actions mutate server state and reject insufficient removals",function()
+ local s,events=Model.State(),{}
+ assert(Model.Apply({type="GiveItem",key="key",amount=2},s,events))
+ eq(Model.Apply({type="RemoveItem",key="key",amount=3},s,events),false) eq(s.items.key,2)
+ assert(Model.Apply({type="RemoveItem",key="key",amount=1},s,events)) eq(s.items.key,1)
+ Model.Apply({type="GiveCurrency",amount=5},s,events) eq(s.currency,5)
+ eq(Model.Apply({type="CompleteQuest",key="q"},s,events),false)
+ Model.Apply({type="StartQuest",key="q"},s,events) Model.Apply({type="CompleteQuest",key="q"},s,events) eq(s.quests.q,"Completed")
+ Model.Apply({type="Event",key="bell"},s,events) eq(events[#events],"bell")
+end)
+test("validator rejects IDs text broken edges unreachable nodes cycles and defaults",function()
+ local c=Model.Clone(Example) c.projects[1].id="" reject(c,"dialogue ID")
+ c=Model.Clone(Example) c.projects[1].nodes[2].text="" reject(c,"missing dialogue text")
+ c=Model.Clone(Example) c.projects[1].nodes[1].next="missing" reject(c,"broken")
+ c=Model.Clone(Example) table.insert(c.projects[1].nodes,Model.Node("orphan","End")) reject(c,"disconnected") reject(c,"unreachable")
+ c=Model.Clone(Example) c.projects[1].nodes[4].next="start" reject(c,"cycle")
+ c=Model.Clone(Example) c.projects[1].nodes[2].choices[1].default=false reject(c,"default response")
+end)
+test("conditional branches follow true and false outputs",function()
+ local p=Model.Project("branch") local n=Model.Node("check","Condition") n.condition={type="Currency",amount=5} n.yes="hello" n.no="end" p.nodes[1].next="check" table.insert(p.nodes,n)
+ eq(#Model.Validate({version=1,projects={p}}),0)
+ local s=Model.State() eq(Model.Advance(p,{node="start"},s).ended,true)
+ s.currency=5 eq(Model.Advance(p,{node="start"},s).node,"hello")
+end)
+print("Passed "..count.." dialogue behavioral scenarios")

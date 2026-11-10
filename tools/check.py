@@ -15,6 +15,7 @@ for path in sorted([*ROOT.glob('src/**/*.luau'), *ROOT.glob('tests/**/*.luau')])
     subprocess.run([args.compiler, str(path)], check=True, stdout=subprocess.DEVNULL)
 print('PASS: all Luau sources compile')
 subprocess.run([args.luau, 'tests/engine.spec.luau'], cwd=ROOT, check=True)
+subprocess.run([args.luau, 'tests/dialogue.spec.luau'], cwd=ROOT, check=True)
 with tempfile.TemporaryDirectory() as temporary:
     harness_path = Path(temporary) / 'service.spec.luau'
     harness_path.write_text(
@@ -58,3 +59,30 @@ with tempfile.TemporaryDirectory() as temporary:
     for name, relative in {'Engine': 'runtime/Engine.luau', 'Schema': 'shared/Schema.luau', 'QuestService': 'runtime/QuestService.luau', 'Bootstrap': 'runtime/Bootstrap.server.luau', 'Client': 'runtime/Client.client.luau'}.items():
         assert templates[name].find('Properties/string[@name="Value"]').text == (ROOT / 'src' / relative).read_text()
 print('PASS: installable XML module hierarchy and every embedded source match the repository')
+
+from build_dialogue import build_dialogue
+with tempfile.TemporaryDirectory() as temporary:
+    output = Path(temporary) / 'DialogueCraftPro.rbxmx'
+    build_dialogue(output)
+    xml = ET.parse(output).getroot()
+    refs = [n.attrib['referent'] for n in xml.iter('Item')]
+    assert len(refs) == len(set(refs))
+    for prop in xml.iter('ProtectedString'):
+        assert prop.text in [p.read_text() for p in (ROOT / 'src/dialogue').glob('*.luau')]
+    plugin = xml.find('Item')
+    names = {n.find('Properties/string').text for n in plugin.findall('Item')}
+    assert names == {'Model', 'Example', 'Generator', 'Editor', 'Templates'}
+    templates = next(n for n in plugin.findall('Item') if n.attrib['class'] == 'Folder')
+    mapping = {'Model': 'Model.luau', 'Service': 'Service.luau', 'Runtime': 'Runtime.server.luau', 'Client': 'Client.client.luau'}
+    for node in templates.findall('Item'):
+        name = node.find('Properties/string').text
+        assert node.find('Properties/string[@name="Value"]').text == (ROOT / 'src/dialogue' / mapping[name]).read_text()
+print('PASS DialogueCraft packaging hierarchy, references, and runtime template equality')
+
+with tempfile.TemporaryDirectory() as temporary:
+    test = Path(temporary) / 'dialogue-service.luau'
+    test.write_text('local Model=(function()\n'+(ROOT/'src/dialogue/Model.luau').read_text()+'\nend)()\n'
+        +'local Example=(function()\n'+(ROOT/'src/dialogue/Example.luau').read_text()+'\nend)()\n'
+        +'local SOURCE=[====[\n'+(ROOT/'src/dialogue/Service.luau').read_text()+'\n]====]\n'
+        +(ROOT/'tests/dialogue-service.spec.luau').read_text())
+    subprocess.run([args.luau, str(test)], check=True)

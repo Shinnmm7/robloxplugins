@@ -1,6 +1,26 @@
 <!-- coderabbit-ai-generated:v1 -->
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c98985cf065d0150bfdbe3ab4f53623ba53cdaf9c3e1badafc46f1dc25a2767c -->
+
+# Roblox Studio plugins
+
+## DialogueCraft Pro
+
+DialogueCraft Pro adds a visual dialogue graph editor, conditional choices, actions, preview, validation, and generated secure server/client runtime. See [installation, architecture, API, and example instructions](docs/DIALOGUECRAFT.md). Build with `python3 tools/build_dialogue.py`. The plugin itself is Luau; Python only packages the XML.
+
+The repository check now covers <!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:b9077189ebc66fca8477024027ca747087c109181d2ed396dbbdd860fecd1c39 -->
+
+**46 behavioral scenarios**
+
+<!-- /coderabbit-ai-generated:v1 --> across both plugins, plus Luau compilation and package integrity. Native Studio checks remain outstanding. Regenerate QuestForge using the current source for dialogue quest integration.
+
 # QuestForge Pro
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 A Roblox Studio plugin written in Luau for authoring quests and generating a connected server and client quest system. Includes a dark DockWidget editor, persistent player profiles, a quest journal, reusable server modules, and a playable example.
 

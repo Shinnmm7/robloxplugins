@@ -124,4 +124,17 @@ function Engine.Report(state, config, kind, target, amount, item, now)
 	end
 	return settle(state, config, now)
 end
+-- Explicit trusted-server completion for authored dialogue actions.
+function Engine.Complete(state, config, id, now)
+ local entry=state.quests[id]
+ if not entry or entry.status~="Active" then return false,"Quest is not active" end
+ for _,quest in ipairs(config.quests) do
+  if quest.id==id then
+   for _,objective in ipairs(quest.objectives) do entry.progress[objective.id]=objective.count end
+   settle(state,config,now)
+   return true,"Quest completed by server action"
+  end
+ end
+ return false,"Unknown quest"
+end
 return Engine

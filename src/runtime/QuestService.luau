@@ -131,6 +131,16 @@ local function unload(player)
 	owners[player] = nil
 end
 
+-- Authored dialogue can deliberately accept or complete quests on the server.
+function Service.DialogueQuest(player, action, id)
+ if type(id)~="string" or #id>100 or (action~="StartQuest" and action~="CompleteQuest") then return false,"Invalid quest action" end
+ return enqueue(player,function(state)
+  local _,message
+  if action=="StartQuest" then _,message=Engine.Accept(state,config,id,os.time())
+  else _,message=Engine.Complete(state,config,id,os.time()) end
+  return message
+ end)
+end
 function Service.GetState(player)
 	local profile = profiles[player]
 	return if profile then Schema.Clone(profile.state) else nil
