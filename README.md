@@ -6,7 +6,17 @@
 
 # Roblox Studio plugins
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c1e666ab6a78874d89c2fd2b309ec827f53ca516e2417e6e31eb7a529fea361a -->
+
+## CineForge Pro
+
+CineForge Pro provides a visual cinematic timeline, camera and character tracks, preview and generated Luau playback. See the [installation and runtime guide](docs/CINEFORGE.md). Build with `python3 tools/build_cine.py`.
+
 ## DialogueCraft Pro
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 DialogueCraft Pro adds a visual dialogue graph editor, conditional choices, actions, preview, validation, and generated secure server/client runtime. See [installation, architecture, API, and example instructions](docs/DIALOGUECRAFT.md). Build with `python3 tools/build_dialogue.py`. The plugin itself is Luau; Python only packages the XML.
 
@@ -14,7 +24,13 @@ The repository check now covers <!-- coderabbit-ai-generated:v1 -->
 
 <!-- coderabbit-ai-generated-section:v1:b9077189ebc66fca8477024027ca747087c109181d2ed396dbbdd860fecd1c39 -->
 
-**46 behavioral scenarios**
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:b1333680dc61a6f8d4e58e67cab8663f34a4037eb2bff4f58ef66586d3a56efb -->
+
+**69 behavioral scenarios**
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 --> across both plugins, plus Luau compilation and package integrity. Native Studio checks remain outstanding. Regenerate QuestForge using the current source for dialogue quest integration.
 

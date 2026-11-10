@@ -16,6 +16,7 @@ for path in sorted([*ROOT.glob('src/**/*.luau'), *ROOT.glob('tests/**/*.luau')])
 print('PASS: all Luau sources compile')
 subprocess.run([args.luau, 'tests/engine.spec.luau'], cwd=ROOT, check=True)
 subprocess.run([args.luau, 'tests/dialogue.spec.luau'], cwd=ROOT, check=True)
+subprocess.run([args.luau, 'tests/cine.spec.luau'], cwd=ROOT, check=True)
 with tempfile.TemporaryDirectory() as temporary:
     harness_path = Path(temporary) / 'service.spec.luau'
     harness_path.write_text(
@@ -85,4 +86,53 @@ with tempfile.TemporaryDirectory() as temporary:
         +'local Example=(function()\n'+(ROOT/'src/dialogue/Example.luau').read_text()+'\nend)()\n'
         +'local SOURCE=[====[\n'+(ROOT/'src/dialogue/Service.luau').read_text()+'\n]====]\n'
         +(ROOT/'tests/dialogue-service.spec.luau').read_text())
+    subprocess.run([args.luau, str(test)], check=True)
+
+from build_cine import build_cine
+with tempfile.TemporaryDirectory() as temporary:
+    output = Path(temporary) / 'CineForgePro.rbxmx'
+    build_cine(output)
+    root = ET.parse(output).getroot()
+    refs = [n.attrib['referent'] for n in root.iter('Item')]
+    assert len(refs) == len(set(refs))
+    plugin = root.find('Item')
+    assert plugin.find('Properties/ProtectedString').text == (ROOT / 'src/cine/Plugin.server.luau').read_text()
+    children = {n.find('Properties/string').text: n for n in plugin.findall('Item')}
+    assert set(children) == {'Model', 'Player', 'Example', 'Generator', 'Editor', 'Templates'}
+    for name in ('Model', 'Player', 'Example', 'Generator', 'Editor'):
+        assert children[name].find('Properties/ProtectedString').text == (ROOT / 'src/cine' / (name + '.luau')).read_text()
+    mapping = {'Model':'Model.luau', 'Player':'Player.luau', 'Client':'Client.client.luau'}
+    templates = {n.find('Properties/string').text:n for n in children['Templates'].findall('Item')}
+    assert set(templates) == set(mapping)
+    for name, filename in mapping.items():
+        assert templates[name].find('Properties/string[@name="Value"]').text == (ROOT / 'src/cine' / filename).read_text()
+    test = Path(temporary) / 'cine-player.luau'
+    test.write_text('local Model=(function()\n'+(ROOT/'src/cine/Model.luau').read_text()+'\nend)()\n'
+        +'local Example=(function()\n'+(ROOT/'src/cine/Example.luau').read_text()+'\nend)()\n'
+        +'local PLAYER_SOURCE=[====[\n'+(ROOT/'src/cine/Player.luau').read_text()+'\n]====]\n'
+        +(ROOT/'tests/cine-player.spec.luau').read_text())
+    subprocess.run([args.luau, str(test)], check=True)
+print('PASS CineForge package hierarchy, source, and runtime templates')
+
+with tempfile.TemporaryDirectory() as temporary:
+    test = Path(temporary) / 'cine-editor.luau'
+    test.write_text('local Model=(function()\n'+(ROOT/'src/cine/Model.luau').read_text()+'\nend)()\n'
+        +'local Example=(function()\n'+(ROOT/'src/cine/Example.luau').read_text()+'\nend)()\n'
+        +'local EDITOR_SOURCE=[====[\n'+(ROOT/'src/cine/Editor.luau').read_text()+'\n]====]\n'
+        +(ROOT/'tests/cine-editor.spec.luau').read_text())
+    subprocess.run([args.luau, str(test)], check=True)
+
+with tempfile.TemporaryDirectory() as temporary:
+    test = Path(temporary) / 'cine-generator.luau'
+    test.write_text('local Model=(function()\n'+(ROOT/'src/cine/Model.luau').read_text()+'\nend)()\n'
+        +'local Example=(function()\n'+(ROOT/'src/cine/Example.luau').read_text()+'\nend)()\n'
+        +'local SOURCE=[====[\n'+(ROOT/'src/cine/Generator.luau').read_text()+'\n]====]\n'
+        +(ROOT/'tests/cine-generator.spec.luau').read_text())
+    subprocess.run([args.luau, str(test)], check=True)
+
+with tempfile.TemporaryDirectory() as temporary:
+    test = Path(temporary) / 'cine-client.luau'
+    test.write_text('local Example=(function()\n'+(ROOT/'src/cine/Example.luau').read_text()+'\nend)()\n'
+        +'local CLIENT_SOURCE=[====[\n'+(ROOT/'src/cine/Client.client.luau').read_text()+'\n]====]\n'
+        +(ROOT/'tests/cine-client.spec.luau').read_text())
     subprocess.run([args.luau, str(test)], check=True)
