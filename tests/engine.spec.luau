@@ -1,0 +1,168 @@
+local Schema = require("../src/shared/Schema")
+local Engine = require("../src/runtime/Engine")
+local Example = require("../src/shared/Example")
+local passed = 0
+local function test(name, callback)
+	callback()
+	passed += 1
+	print("PASS " .. name)
+end
+local function eq(actual, expected) assert(actual == expected, tostring(actual) .. " ~= " .. tostring(expected)) end
+local function quest(id, kind)
+	local q = Schema.NewQuest(id)
+	q.objectives[1].type = kind or "Talk"
+	q.objectives[1].target = "target"
+	return q
+end
+local function configuration(...) return {version = 1, quests = {...}} end
+local function rejected(config, fragment)
+	local errors = Schema.Validate(config)
+	assert(#errors > 0, "Expected configuration rejection")
+	assert(string.find(table.concat(errors, "\n"), fragment, 1, true), table.concat(errors, "\n"))
+end
+
+test("working example validates and grants all rewards exactly once", function()
+	local config, state = Schema.Clone(Example), Engine.NewState()
+	eq(#Schema.Validate(config), 0)
+	assert(Engine.Accept(state, config, "crystal_errand", 100))
+	Engine.Report(state, config, "Talk", "rowan", 1, nil, 100)
+	eq(state.quests.crystal_errand.stage, 2)
+	Engine.Report(state, config, "Collect", "crystal", 3, nil, 101)
+	eq(state.quests.crystal_errand.stage, 3)
+	Engine.Report(state, config, "Deliver", "rowan", 3, "crystal", 102)
+	eq(state.quests.crystal_errand.status, "Completed")
+	eq(state.items.crystal, 0) eq(state.xp, 100) eq(state.currency, 25) eq(state.items.village_token, 1)
+	eq(state.metadata.rowanFriend.unlocked, true)
+	Engine.Report(state, config, "Deliver", "rowan", 3, "crystal", 103)
+	eq(state.xp, 100)
+	eq(Engine.Accept(state, config, "crystal_errand", 131), false)
+	assert(Engine.Accept(state, config, "crystal_errand", 132))
+end)
+test("all objective types progress through trusted events", function()
+	for _, kind in ipairs({"Kill", "Collect", "Talk", "Reach", "Interact", "Deliver"}) do
+		local q = quest("q", kind) q.objectives[1].count = 2
+		if kind == "Deliver" then q.objectives[1].item = "apple" end
+		local config, state = configuration(q), Engine.NewState()
+		state.items.apple = 2
+		assert(Engine.Accept(state, config, "q", 0))
+		Engine.Report(state, config, kind, "wrong", 2, "apple", 1)
+		eq(state.quests.q.status, "Active")
+		Engine.Report(state, config, kind, "target", 1, "apple", 2)
+		eq(state.quests.q.progress.objective_1, 1)
+		Engine.Report(state, config, kind, "target", 1, "apple", 3)
+		eq(state.quests.q.status, "Completed")
+	end
+end)
+test("delivery cannot spend absent items or the wrong item", function()
+	local q = quest("q", "Deliver") q.objectives[1].item = "apple" q.objectives[1].count = 3
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Deliver", "target", 9, "apple", 1)
+	eq(state.quests.q.progress.objective_1, 0)
+	state.items.apple = 2
+	Engine.Report(state, config, "Deliver", "target", 9, "stone", 2)
+	eq(state.items.apple, 2)
+	Engine.Report(state, config, "Deliver", "target", 9, "apple", 3)
+	eq(state.items.apple, 0) eq(state.quests.q.progress.objective_1, 2)
+end)
+test("sequential actions cannot satisfy two objectives from one event", function()
+	local q = quest("q")
+	local second = Schema.Clone(q.objectives[1]) second.id = "second" second.sequential = true
+	table.insert(q.objectives, second)
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	eq(state.quests.q.status, "Active") eq(state.quests.q.progress.second, nil)
+	Engine.Report(state, config, "Talk", "target", 1, nil, 2)
+	eq(state.quests.q.status, "Completed")
+end)
+test("optional objectives do not block All completion", function()
+	local q = quest("q")
+	local optional = Schema.Clone(q.objectives[1]) optional.id = "optional" optional.target = "other" optional.optional = true
+	table.insert(q.objectives, optional)
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	eq(state.quests.q.status, "Completed")
+end)
+test("Any completion accepts one required objective", function()
+	local q = quest("q") q.stages[1].completion = "Any"
+	local second = Schema.Clone(q.objectives[1]) second.id = "second" second.target = "other"
+	table.insert(q.objectives, second)
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	eq(state.quests.q.status, "Completed")
+end)
+test("All waits for every required objective and clamps counts", function()
+	local q = quest("q")
+	local second = Schema.Clone(q.objectives[1]) second.id = "second" second.target = "other"
+	table.insert(q.objectives, second)
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Talk", "target", 100, nil, 1)
+	eq(state.quests.q.status, "Active") eq(state.quests.q.progress.objective_1, 1)
+	Engine.Report(state, config, "Talk", "other", 1, nil, 1)
+	eq(state.quests.q.status, "Completed")
+end)
+test("one-time, prerequisites, level and inventory gates are enforced", function()
+	local a, b = quest("a"), quest("b")
+	b.prerequisites = {"a"} b.requirements = {minLevel = 3, items = {{id = "key", amount = 1}}}
+	local config, state = configuration(a, b), Engine.NewState()
+	eq(Engine.Accept(state, config, "b", 0), false)
+	state.level = 3 state.items.key = 1
+	eq(Engine.Accept(state, config, "b", 0), false)
+	assert(Engine.Accept(state, config, "a", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	eq(Engine.Accept(state, config, "a", 2), false)
+	assert(Engine.Accept(state, config, "b", 2)) eq(state.items.key, 1)
+end)
+test("abandon resets progress but retains repeat completion history", function()
+	local q = quest("q") q.repeatable = true
+	local config, state = configuration(q), Engine.NewState()
+	assert(Engine.Accept(state, config, "q", 0))
+	assert(Engine.Abandon(state, "q"))
+	assert(Engine.Accept(state, config, "q", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	assert(Engine.Accept(state, config, "q", 2))
+	assert(Engine.Abandon(state, "q")) eq(state.quests.q.completions, 1)
+end)
+test("CompleteQuest cascades across quests and many stages", function()
+	local a, b, c = quest("a"), quest("b", "CompleteQuest"), quest("c", "CompleteQuest")
+	b.objectives[1].target = "a" c.objectives[1].target = "b"
+	b.stages = {} b.objectives = {}
+	for i = 1, 10 do
+		table.insert(b.stages, {name = "Stage " .. i, completion = "All"})
+		table.insert(b.objectives, {id = "o" .. i, type = "CompleteQuest", target = "a", label = "Finish a", count = 1, stage = i, optional = false, sequential = false})
+	end
+	local config, state = configuration(c, b, a), Engine.NewState()
+	eq(#Schema.Validate(config), 0)
+	assert(Engine.Accept(state, config, "c", 0)) assert(Engine.Accept(state, config, "b", 0)) assert(Engine.Accept(state, config, "a", 0))
+	Engine.Report(state, config, "Talk", "target", 1, nil, 1)
+	eq(state.quests.c.status, "Completed") eq(state.xp, 300)
+end)
+test("empty project is valid and unknown IDs are rejected", function()
+	eq(#Schema.Validate(configuration()), 0)
+	eq(Engine.Accept(Engine.NewState(), configuration(), "missing", 0), false)
+end)
+test("validator rejects duplicates, missing dependencies and cycles", function()
+	local a, b = quest("a"), quest("b")
+	rejected(configuration(a, Schema.Clone(a)), "duplicate ID")
+	a.prerequisites = {"missing"} rejected(configuration(a), "missing referenced quest")
+	a.prerequisites = {"b"} b.prerequisites = {"a"} rejected(configuration(a, b), "cycle")
+	a.prerequisites = {} a.objectives[1].type = "CompleteQuest" a.objectives[1].target = "a"
+	rejected(configuration(a), "cycle")
+end)
+test("validator rejects malformed objective and reward data", function()
+	for _, amount in ipairs({0, -1, 0/0, math.huge, 1.5}) do
+		local q = quest("q") q.rewards[1].amount = amount rejected(configuration(q), "reward amount")
+	end
+	local q = quest("q", "Deliver") rejected(configuration(q), "delivery item")
+	q = quest("q") q.objectives[1].stage = 2 rejected(configuration(q), "stage does not exist")
+	q = quest("q") q.objectives[1].optional = true rejected(configuration(q), "needs a required")
+	q = quest("q") q.objectives[1].count = 0 rejected(configuration(q), "count")
+	q = quest("q") q.rewards = {{type = "Metadata", key = "x", value = function() end}} rejected(configuration(q), "metadata")
+	q.rewards[1].value = {} q.rewards[1].value.self = q.rewards[1].value rejected(configuration(q), "metadata")
+	q = quest("q") q.objectives[1].id = 0/0 rejected(configuration(q), "objective ID")
+end)
+print("Passed " .. passed .. " engine and validation scenarios")
