@@ -136,3 +136,6 @@ with tempfile.TemporaryDirectory() as temporary:
         +'local CLIENT_SOURCE=[====[\n'+(ROOT/'src/cine/Client.client.luau').read_text()+'\n]====]\n'
         +(ROOT/'tests/cine-client.spec.luau').read_text())
     subprocess.run([args.luau, str(test)], check=True)
+
+from check_npc import check_npc
+check_npc(args.luau, args.compiler)

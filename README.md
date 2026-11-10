@@ -10,7 +10,19 @@
 
 <!-- coderabbit-ai-generated-section:v1:c1e666ab6a78874d89c2fd2b309ec827f53ca516e2417e6e31eb7a529fea361a -->
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:773da8cbe56536df58a2a676fd9c1d25911ba53f63281db39fe1cc6e3ad019c5 -->
+
+## NPC Creator Pro
+
+NPC Creator Pro adds independent custom R6/R15 and username-based avatar creation, a WorldModel preview, NPC management, local presets and optional server AI. The plugin is Luau; Python only packages the installable model. See the [installation, features, architecture and Studio acceptance guide](docs/NPC_CREATOR.md). Build with `python3 tools/build_npc.py`; check with `python3 tools/check_npc.py --luau /path/to/luau --compiler /path/to/luau-compile`.
+
+The new NPC compiler, six behavioral harness groups and XML integrity checks passed. Native Roblox Studio validation remains outstanding; prior checks for the other plugins are reused from their unchanged sources.
+
 ## CineForge Pro
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 CineForge Pro provides a visual cinematic timeline, camera and character tracks, preview and generated Luau playback. See the [installation and runtime guide](docs/CINEFORGE.md). Build with `python3 tools/build_cine.py`.
 
@@ -32,7 +44,13 @@ The repository check now covers <!-- coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
 
-<!-- /coderabbit-ai-generated:v1 --> across both plugins, plus Luau compilation and package integrity. Native Studio checks remain outstanding. Regenerate QuestForge using the current source for dialogue quest integration.
+<!-- /coderabbit-ai-generated:v1 --><!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:2af0d9a6cb46e6196c53ca1d85f84ee954db30e10af4bd47bf30ab6d9ebba096 -->
+
+ across QuestForge, DialogueCraft and CineForge, plus Luau compilation and package integrity. NPC Creator adds six behavioral harness groups and package checks.
+
+<!-- /coderabbit-ai-generated:v1 --> Native Studio checks remain outstanding. Regenerate QuestForge using the current source for dialogue quest integration.
 
 # QuestForge Pro
 

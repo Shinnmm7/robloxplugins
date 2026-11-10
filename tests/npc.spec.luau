@@ -1,0 +1,21 @@
+local Model=require("../src/npc/Model")
+local function valid(c) local e=Model.Validate(c,true) assert(#e==0,table.concat(e,", ")) end
+local c=Model.New() valid(c) c.rig="R6" valid(c)
+local copy=Model.Clone(c) copy.appearance.colors.HeadColor[1]=10 assert(c.appearance.colors.HeadColor[1]==163)
+assert(#Model.Validate(nil)>0)
+for _,pair in ipairs({{"name",""},{"health",0},{"speed",201},{"jump",-1},{"rig","R7"},{"showName","yes"},{"displayName",false},{"userId",-1}}) do local x=Model.Clone(c) x[pair[1]]=pair[2] assert(#Model.Validate(x,true)>0,pair[1]) end
+local avatar=Model.New("Avatar") avatar.username="Roblox" assert(#Model.Validate(avatar,false)==0) assert(#Model.Validate(avatar,true)>0)
+avatar.username="@Roblox" assert(#Model.Validate(avatar,false)>0)
+local x=Model.Clone(c) x.appearance.properties.Head=-1 assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.appearance.properties.Head=nil assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.appearance.colors.HeadColor={1,2,256} assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.appearance.properties.WidthScale=0/0 assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.appearance.properties.Source="code" assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.appearance.accessories={{AssetId=123,AccessoryType="Hat",IsLayered=false}} valid(x)
+x.appearance.accessories[1].AssetId="123" assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.behavior.enabled=true x.behavior.motion="Patrol" assert(#Model.Validate(x,true)>0)
+x.behavior.patrol={{0,1,2},{4,5,6}} valid(x)
+x.behavior.patrol[2][1]=math.huge assert(#Model.Validate(x,true)>0)
+x=Model.Clone(c) x.behavior.attackInterval=0 assert(#Model.Validate(x,true)>0)
+for _,motion in ipairs(Model.Motions) do x=Model.Clone(c) x.behavior.enabled=true x.behavior.motion=motion x.behavior.patrol={{0,0,0},{5,0,0}} valid(x) end
+print("PASS NPC schema: defaults, independent modes, clones, malformed input, appearance whitelist, finite numbers, assets, patrol and behavior bounds")
